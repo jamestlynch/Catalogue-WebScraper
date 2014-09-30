@@ -41,14 +41,18 @@ subsections = []
 
 
 # Store the page's contents
-def writeOutput(response):
+def writeOutput(contents):
     f.write("<section id=\"")
     #f.write(" ".join(response.read().partition("<a href=\"http://catalogue.usc.edu/schools/\">The Schools</a> &raquo;")[2].partition("</p></div><!--/#breadcrumb-->")[0].strip().split()).replace(" ", "-").lower())
     f.write("\">")
 
     #print response.find(name="div", attrs={'id': 'content-main'})
 
-    pageContents = response.read().partition("<!--/#breadcrumb-->")[2].partition("<div class=\"comments-info\">")[0]
+    pageContents = contents.partition("<!--/#breadcrumb-->")[2].partition("<div class=\"comments-info\">")[0]
+
+    if "img" in pageContents:
+        pageContents = pageContents.replace("/files/", "http://catalogue.usc.edu/files/")
+        #print "[^^^] Image found: " + pageContents.partition("src=\"")[2].partition("\"")[0]
 
     f.write(pageContents)
     f.write("</section>")
@@ -67,7 +71,7 @@ try:
     br.open(urls[0])
     urls.pop(0)
     for link in br.links():
-        newurl =  urlparse.urljoin(link.base_url,link.url)
+        newurl =  urlparse.urljoin(link.base_url,link.url).partition("#")[0]
         #print newurl
         if newurl not in visited and url in newurl:
             visited.append(newurl)
@@ -78,7 +82,6 @@ except:
     errorCount = errorCount + 1
     urls.pop(0)
 
-print len(urls)
 
 
 
@@ -89,23 +92,48 @@ print len(urls)
 #   have new ones on the webpage
 while len(urls)>0:
     try:
-        response = br.open(urls[0])
-        urls.pop(0)
         linkCounter = linkCounter + 1
         print str(linkCounter) + ")\t" + urls[0] + "\t\t" + str(errorCount) + " errors"
-        writeOutput(response)
+
+        response = br.open(urls[0])
+        urls.pop(0)
         
-        for link in br.links():
-            newurl =  urlparse.urljoin(link.base_url,link.url).partition("#")[0]
-            # print newurl
-            if newurl not in visited and url in newurl:
-                print "New URL: " + newurl
+        contents = response.read()
+        writeOutput(contents)
+        
+        subMenuContents = contents.partition("<ul class=\"sub-menu\">")[2].partition("</ul>")[0]
+
+        while subMenuContents != "":
+            href = subMenuContents.partition("href=\"")[2].partition("\"")[0].partition("#")[0]
+            if not "http://catalogue.usc.edu/" in href:
+                href = "http://catalogue.usc.edu" + href # make relative URL absolute
+            if href not in visited and url in href:
+                visited.append(href)
+                subsections.insert(0, href)
+                #print href
+            
+            subMenuContents = subMenuContents.partition("</li>")[2] # take contents following first list item, and run through loop again
+
+        for section in subsections:
+            #print "[!!!] Inserting: " + section
+            urls.insert(0, section)
+        
+        del subsections[:]
+
+        # for link in subMenu.links():
+        #     newurl =  urlparse.urljoin(link.base_url,link.url).partition("#")[0]
+        #     print newurl
+        # for link in br.links():
+        #     newurl =  urlparse.urljoin(link.base_url,link.url).partition("#")[0]
+        #     # print newurl
+        #     if newurl not in visited and url in newurl:
+        #         print "New URL: " + newurl
         #         visited.append(newurl)
         #         subsections.append(newurl)
         #         #print newurl
         # urls.insert(0, subsections)
     except:
-        #print "error: " + urls[0] 
+        print "error: " + urls[0] 
         errorCount = errorCount + 1
         if len(urls)>0:
             urls.pop(0)
@@ -116,4 +144,6 @@ while len(urls)>0:
 
 
 
-print "done" #visited
+print "\n**************************************************" #visited
+print "\n*                      DONE                      *"
+print "\n**************************************************"
